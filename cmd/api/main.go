@@ -37,13 +37,18 @@ func main() {
 	}
 	log.Println("Connected to queue")
 
+	s := &operations.Server{
+		DBClient:    dbClient,
+		QueueClient: queueClient,
+	}
+
 	// Define routes
 	router := chi.NewRouter()
 
-	router.Get("/address/{addr}/balance", operations.GetAddressBalance)
-	router.Get("/address/{addr}/transactions", operations.GetAddressTransactions)
-	router.Post("/address/add", operations.AddAddress)
-	router.Post("/address/remove", operations.RemoveAddress)
+	router.Get("/address/{addr}/balance", s.GetAddressBalance)
+	router.Get("/address/{addr}/transactions", s.GetAddressTransactions)
+	router.Post("/address/add", s.AddAddress)
+	router.Post("/address/remove", s.RemoveAddress)
 
 	fmt.Println("Serving requests on port :8080")
 	http.ListenAndServe(":8080", router)
