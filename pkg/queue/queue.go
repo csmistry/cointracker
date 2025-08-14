@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -11,6 +12,11 @@ import (
 type QueueClient struct {
 	conn  *amqp091.Connection
 	queue amqp091.Queue
+}
+
+type Job struct {
+	Type    string `json:"type"`
+	Address string `json:"address"`
 }
 
 const (
@@ -77,4 +83,29 @@ func (qc *QueueClient) Ping() error {
 // Conn returns a queue connection
 func (qc *QueueClient) Conn() *amqp091.Connection {
 	return qc.conn
+}
+
+// PublishJob puts a job on the queue
+func (qc *QueueClient) PublishJob(job Job) error {
+	body, err := json.Marshal(job)
+	if err != nil {
+		return err
+	}
+
+	channel, err := qc.conn.Channel()
+	if err != nil {
+		return fmt.Errorf("failed to create channel for job publish: %v", err)
+	}
+	defer channel.Close()
+
+	return channel.Publish(
+		"",        // exchange
+		JOB_QUEUE, // routing key
+		false,     // mandatory
+		false,     // immediate
+		amqp091.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
 }

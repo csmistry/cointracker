@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 
 	"github.com/csmistry/cointracker/pkg/db"
@@ -55,7 +56,20 @@ func main() {
 
 	// process messages as long as channel remains open
 	for msg := range msgs {
-		log.Println("Received job:", string(msg.Body))
+		var job queue.Job
+		if err := json.Unmarshal(msg.Body, &job); err != nil {
+			log.Println("failed to parse job:", err)
+			continue
+		}
+
+		switch job.Type {
+		case "ADD":
+			log.Println("Syncing address:", job.Address)
+		case "REMOVE":
+			log.Println("Removing address:", job.Address)
+		default:
+			log.Println("unknown Job Type")
+		}
 	}
 
 	log.Println("Sync service stopped")
