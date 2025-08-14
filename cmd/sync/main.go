@@ -1,18 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/csmistry/cointracker/pkg/db"
-	"github.com/csmistry/cointracker/pkg/operations"
 	"github.com/csmistry/cointracker/pkg/queue"
-	"github.com/go-chi/chi/v5"
 )
 
 func main() {
-
 	// connect to DB
 	dbClient, err := db.InitDB()
 	if err != nil {
@@ -37,14 +32,31 @@ func main() {
 	}
 	log.Println("Connected to queue")
 
-	// Define routes
-	router := chi.NewRouter()
+	conn := queueClient.Conn()
+	channel, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("failed to create consumer channel: %v", err)
+	}
 
-	router.Get("/address/{addr}/balance", operations.GetAddressBalance)
-	router.Get("/address/{addr}/transactions", operations.GetAddressTransactions)
-	router.Post("/address/add", operations.AddAddress)
-	router.Post("/address/remove", operations.RemoveAddress)
+	// messages will be received on channel msgs
+	msgs, err := channel.Consume(
+		queue.JOB_QUEUE,
+		"",
+		true,  // auto-ack
+		false, // exclusive
+		false, // no-local
+		false, // no-wait
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("failed to consume messages: %v", err)
+	}
+	log.Println("Sync service started...")
 
-	fmt.Println("Serving requests on port :8080")
-	http.ListenAndServe(":8080", router)
+	// process messages as long as channel remains open
+	for msg := range msgs {
+		log.Println("Received job:", string(msg.Body))
+	}
+
+	log.Println("Sync service stopped")
 }

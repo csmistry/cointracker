@@ -8,8 +8,7 @@ RUN go mod download
 # Copy everything from root
 COPY . .
 
-# Build api server binary
-RUN go build -o api ./cmd/api
+# Build sync service binary
+RUN go build -o sync ./cmd/sync
 
-EXPOSE 8080
-ENTRYPOINT ["./api"]
+ENTRYPOINT ["./sync"]

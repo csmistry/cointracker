@@ -13,6 +13,10 @@ type QueueClient struct {
 	queue amqp091.Queue
 }
 
+const (
+	JOB_QUEUE = "sync_jobs"
+)
+
 // InitQueue initializes a queue
 func InitQueue() (*QueueClient, error) {
 	uri := os.Getenv("RABBITMQ_URI")
@@ -43,7 +47,7 @@ func InitQueue() (*QueueClient, error) {
 
 	// create queue
 	queue, err = channel.QueueDeclare(
-		"sync_jobs",
+		JOB_QUEUE,
 		true,  // durable
 		false, // delete when unused
 		false, // exclusive
@@ -68,4 +72,9 @@ func (qc *QueueClient) Ping() error {
 	}
 	c.Close()
 	return nil
+}
+
+// Conn returns a queue connection
+func (qc *QueueClient) Conn() *amqp091.Connection {
+	return qc.conn
 }
