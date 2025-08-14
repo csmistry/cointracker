@@ -32,6 +32,16 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: password
+  sync:
+    build:
+      context: .
+      dockerfile: docker/sync.Dockerfile
+    environment:
+      MONGO_URI: "mongodb://root:password@mongo:27017"
+      RABBITMQ_URI: "amqp://guest:password@rabbitmq:5672/"
+    depends_on:
+      - mongo
+      - rabbitmq
 
 volumes:
   mongo-data:
