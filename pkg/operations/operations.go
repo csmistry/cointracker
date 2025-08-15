@@ -40,7 +40,7 @@ func (s *Server) GetAddressBalance(w http.ResponseWriter, r *http.Request) {
 		Balance int64 `bson:"balance"`
 	}
 
-	err := addrColl.FindOne(ctx, bson.M{"address": addr}).Decode(&addrDoc)
+	err := addrColl.FindOne(ctx, bson.M{"address": addr, "archived": false}).Decode(&addrDoc)
 	if err != nil {
 		http.Error(w, "address not found", http.StatusNotFound)
 		return
@@ -70,7 +70,7 @@ func (s *Server) GetAddressTransactions(w http.ResponseWriter, r *http.Request) 
 
 	txColl := s.dBClient.TransactionCollection()
 	cur, err := txColl.Find(ctx,
-		bson.M{"address": addr},
+		bson.M{"address": addr, "archived": false},
 		options.Find().SetSort(bson.M{"timestamp": -1}).SetSkip(int64(offset)).SetLimit(int64(limit)),
 	)
 	if err != nil {
