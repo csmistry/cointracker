@@ -71,8 +71,8 @@ func main() {
 			syncer.HandleAdd(job)
 		case "REMOVE":
 			log.Println("Removing address:", job.Address)
-		default:
 			syncer.HandleRemove(job)
+		default:
 			log.Println("unknown Job Type")
 		}
 	}

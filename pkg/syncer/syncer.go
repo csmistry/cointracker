@@ -28,6 +28,7 @@ type AddressState struct {
 	TotalTransactions int
 	Balance           int64
 	Synced            bool
+	Archived          bool
 }
 
 type Transaction struct {
@@ -66,6 +67,7 @@ func (s *Syncer) HandleAdd(job queue.Job) {
 			NextOffset: 0,
 			Balance:    0,
 			Synced:     false,
+			Archived:   false,
 		}
 		s.addressCache[job.Address] = state
 	} else if state.Synced {
@@ -78,6 +80,21 @@ func (s *Syncer) HandleAdd(job queue.Job) {
 
 		ctx := context.Background()
 		offset := 0
+
+		if state.Archived {
+			state.Archived = false
+
+			// check if address exists and get last synced info
+			var addrDoc struct {
+				TxCount int64 `bson:"tx_count"`
+			}
+			err := s.dbClient.AddressCollection().FindOne(ctx, bson.M{"address": address}).Decode(&addrDoc)
+			if err == nil {
+				// Address exists, resume from last synced tx
+				offset = int(addrDoc.TxCount)
+			}
+		}
+
 		limit := 100
 
 		// fetch until all transactions have synced
@@ -95,6 +112,7 @@ func (s *Syncer) HandleAdd(job queue.Job) {
 					"balance":      balance,
 					"tx_count":     offset + len(txs),
 					"last_updated": time.Now(),
+					"archived":     false,
 				},
 				"$setOnInsert": bson.M{
 					"syncing": true,
@@ -141,8 +159,20 @@ func (s *Syncer) HandleAdd(job queue.Job) {
 	}(job.Address)
 }
 
+// HandleRemove archives an address from the wallet
 func (s *Syncer) HandleRemove(job queue.Job) {
+	ctx := context.Background()
+	addrColl := s.dbClient.AddressCollection()
 
+	filter := bson.M{"address": job.Address}
+	update := bson.M{"$set": bson.M{"archived": true}}
+
+	_, err := addrColl.UpdateOne(ctx, filter, update)
+	if err != nil {
+		log.Printf("failed to archive address: %s", job.Address)
+	}
+	s.addressCache[job.Address].Archived = true
+	log.Printf("archived address: %s", job.Address)
 }
 
 func (s *Syncer) FetchFromBlockchain(address string, offset, limit int) (int64, []Transaction, bool, error) {
