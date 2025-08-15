@@ -37,10 +37,7 @@ func main() {
 	}
 	log.Println("Connected to queue")
 
-	s := &operations.Server{
-		DBClient:    dbClient,
-		QueueClient: queueClient,
-	}
+	s := operations.NewServer(dbClient, queueClient)
 
 	// Define routes
 	router := chi.NewRouter()
