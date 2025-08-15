@@ -6,6 +6,7 @@ import (
 
 	"github.com/csmistry/cointracker/pkg/db"
 	"github.com/csmistry/cointracker/pkg/queue"
+	"github.com/csmistry/cointracker/pkg/syncer"
 )
 
 func main() {
@@ -39,6 +40,8 @@ func main() {
 		log.Fatalf("failed to create consumer channel: %v", err)
 	}
 
+	syncer := syncer.NewSyncer(dbClient, queueClient)
+
 	// messages will be received on channel msgs
 	msgs, err := channel.Consume(
 		queue.JOB_QUEUE,
@@ -65,9 +68,11 @@ func main() {
 		switch job.Type {
 		case "ADD":
 			log.Println("Syncing address:", job.Address)
+			syncer.HandleAdd(job)
 		case "REMOVE":
 			log.Println("Removing address:", job.Address)
 		default:
+			syncer.HandleRemove(job)
 			log.Println("unknown Job Type")
 		}
 	}
