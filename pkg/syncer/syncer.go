@@ -50,6 +50,27 @@ type BlockchainResponse struct {
 	} `json:"txs"`
 }
 
+type BlockchairResponse struct {
+	Data map[string]struct {
+		Address struct {
+			Balance          int64 `json:"balance"`
+			TransactionCount int   `json:"transaction_count"`
+		} `json:"address"`
+		Transactions []struct {
+			Hash    string `json:"hash"`
+			Time    int64  `json:"time"`
+			Inputs  []any  `json:"inputs"`
+			Outputs []struct {
+				Value int64 `json:"value"`
+			} `json:"outputs"`
+		} `json:"transactions"`
+	} `json:"data"`
+	Context struct {
+		Limit  int `json:"limit"`
+		Offset int `json:"offset"`
+	} `json:"context"`
+}
+
 func NewSyncer(dbClient *db.DBClient, queueClient *queue.QueueClient) *Syncer {
 	return &Syncer{
 		dbClient:     dbClient,
@@ -95,7 +116,7 @@ func (s *Syncer) HandleAdd(job queue.Job) {
 			}
 		}
 
-		limit := 100
+		limit := 50
 
 		// fetch until all transactions have synced
 		for {
@@ -154,13 +175,15 @@ func (s *Syncer) HandleAdd(job queue.Job) {
 			}
 
 			offset += limit
-			time.Sleep(2 * time.Second) // simple rate limit
+			time.Sleep(10 * time.Second) // simple rate limit
 		}
 	}(job.Address)
 }
 
 // HandleRemove archives an address from the wallet
 func (s *Syncer) HandleRemove(job queue.Job) {
+	log.Printf("Archiving address: %s", job.Address)
+
 	ctx := context.Background()
 	addrColl := s.dbClient.AddressCollection()
 
@@ -175,6 +198,7 @@ func (s *Syncer) HandleRemove(job queue.Job) {
 	log.Printf("archived address: %s", job.Address)
 }
 
+// FetchFromBlockchain uses blockchain.com
 func (s *Syncer) FetchFromBlockchain(address string, offset, limit int) (int64, []Transaction, bool, error) {
 	url := fmt.Sprintf("https://blockchain.info/rawaddr/%s?offset=%d&limit=%d", address, offset, limit)
 
@@ -210,4 +234,41 @@ func (s *Syncer) FetchFromBlockchain(address string, offset, limit int) (int64, 
 
 	hasMore := offset+limit < data.NTx
 	return data.FinalBalance, txs, hasMore, nil
+}
+
+// FetchFromBlockchair uses blockchair.com
+func (s *Syncer) FetchFromBlockchair(address string, offset, limit int) (balance int64, txs []Transaction, more bool, err error) {
+	url := fmt.Sprintf("https://api.blockchair.com/bitcoin/dashboards/address/%s?transaction_details=true&offset=%d&limit=%d", address, offset, limit)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("status: %s", resp.Status)
+		return
+	}
+
+	var response BlockchairResponse
+	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return
+	}
+
+	info := response.Data[address]
+	balance = info.Address.Balance
+	more = len(info.Transactions) == limit
+
+	for _, t := range info.Transactions {
+		totalOut := int64(0)
+		for _, o := range t.Outputs {
+			totalOut += o.Value
+		}
+		txs = append(txs, Transaction{
+			TxID:      t.Hash,
+			Amount:    totalOut,
+			Timestamp: time.Unix(t.Time, 0),
+		})
+	}
+	return
 }

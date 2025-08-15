@@ -67,10 +67,8 @@ func main() {
 
 		switch job.Type {
 		case "ADD":
-			log.Println("Syncing address:", job.Address)
 			syncer.HandleAdd(job)
 		case "REMOVE":
-			log.Println("Removing address:", job.Address)
 			syncer.HandleRemove(job)
 		default:
 			log.Println("unknown Job Type")
