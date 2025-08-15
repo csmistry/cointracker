@@ -37,3 +37,11 @@ func (db *DBClient) Ping() error {
 	}
 	return nil
 }
+
+func (db *DBClient) AddressCollection() *mongo.Collection {
+	return db.client.Database("wallet").Collection("addresses")
+}
+
+func (db *DBClient) TransactionCollection() *mongo.Collection {
+	return db.client.Database("wallet").Collection("transactions")
+}
